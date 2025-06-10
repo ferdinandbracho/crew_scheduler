@@ -39,7 +39,7 @@ solar_scheduler/
 
    ```bash
    git clone <repository-url>
-   cd aurora
+   cd crew_scheduler
    ```
 
 2. Set up the development environment:
