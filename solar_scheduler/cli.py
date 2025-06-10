@@ -2,80 +2,110 @@ from solar_scheduler.models import Employee, Building
 from solar_scheduler.scheduler import schedule
 
 
+import random
+
+
+def random_availability(available_prob=0.8):
+    """Generate a random availability list with given probability of being available.
+
+    Returns:
+        List of day names (e.g., ["Mon", "Tue", "Fri"]) that the employee is available
+    """
+    days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    return [day for day in days if random.random() < available_prob]
+
+
 def demo_data():
-    # Using numeric IDs and string availability markers
-    emp = [
+    # Create employees with random but realistic availability patterns
+    # Each employee is available on each day with 80% probability by default
+    employees = [
+        # Certified installers
         Employee(
             id=1,
             role="certified",
             name="Certified 1",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.9),  # 90% available
         ),
         Employee(
             id=2,
             role="certified",
             name="Certified 2",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.8),
         ),
         Employee(
             id=3,
             role="certified",
             name="Certified 3",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.7),  # Less available
         ),
+        # Pending certification
         Employee(
             id=4,
             role="pending",
             name="Pending 1",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.8),
         ),
         Employee(
             id=5,
             role="pending",
             name="Pending 2",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.8),
         ),
         Employee(
             id=6,
             role="pending",
             name="Pending 3",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.7),  # Less available
         ),
+        # Laborers
         Employee(
             id=7,
             role="laborer",
             name="Laborer 1",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.8),
         ),
         Employee(
             id=8,
             role="laborer",
             name="Laborer 2",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.6),  # Part-time
         ),
         Employee(
             id=9,
             role="laborer",
             name="Laborer 3",
-            available_days=["Mon", "Tue", "Wed", "Thu", "Fri"],
+            available_days=random_availability(0.9),  # Mostly available
+        ),
+        Employee(
+            id=10,
+            role="laborer",
+            name="Laborer 4",
+            available_days=random_availability(0.5),  # Only half available
         ),
     ]
-    bld = [
+    # Buildings are processed in the order they appear in this list
+    # Earlier buildings have higher priority for scheduling
+    buildings = [
+        # High priority buildings (will be scheduled first)
         Building(id=1, type="commercial"),
         Building(id=2, type="single"),
         Building(id=3, type="two"),
+        # Medium priority buildings
         Building(id=4, type="commercial"),
         Building(id=5, type="single"),
         Building(id=6, type="two"),
+        # Lower priority buildings
         Building(id=7, type="commercial"),
         Building(id=8, type="single"),
         Building(id=9, type="two"),
+        # Lowest priority buildings (will be scheduled last)
         Building(id=10, type="commercial"),
         Building(id=11, type="single"),
         Building(id=12, type="two"),
         Building(id=13, type="commercial"),
     ]
-    return bld, emp
+
+    return buildings, employees
 
 
 def format_crew(crew):
@@ -89,7 +119,16 @@ def get_unscheduled_buildings(buildings, scheduled_ids):
 
 
 def main():
-    all_buildings, employees = demo_data()
+    buildings, employees = demo_data()
+
+    if not buildings:
+        print("No buildings provided for scheduling. Exiting.")
+        return
+
+    if not employees:
+        print("No employees available for scheduling. Exiting.")
+        return
+
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
     week_number = 1
@@ -97,18 +136,18 @@ def main():
 
     while True:
         # Get buildings not yet scheduled
-        remaining_buildings = get_unscheduled_buildings(all_buildings, scheduled_building_ids)
+        remaining_buildings = get_unscheduled_buildings(
+            buildings, scheduled_building_ids
+        )
 
         if not remaining_buildings:
-            print("\n" + "=" * 60)
-            print("ALL BUILDINGS HAVE BEEN SCHEDULED!".center(60))
-            print("=" * 60)
+            print("ALL BUILDINGS HAVE BEEN SCHEDULED!")
             break
 
         # Print week header
-        print("\n" + "#" * 60)
-        print(f" WEEK {week_number} ".center(60, "#"))
-        print("#" * 60 + "\n")
+        print("-" * 60)
+        print(f"WEEK {week_number}")
+        print("-" * 60)
 
         # Schedule remaining buildings for this week
         plan = schedule(remaining_buildings, employees)
@@ -121,7 +160,7 @@ def main():
             print(f"{day_name}:")
             print("-" * (len(day_name) + 1))
 
-            day_assignments = plan[day_idx] if day_idx < len(plan) else []
+            day_assignments = plan.get(day_idx, [])
 
             if not day_assignments:
                 print("  No buildings scheduled\n")
@@ -129,29 +168,35 @@ def main():
 
             for building, crew in day_assignments:
                 crew_list = ", ".join(format_crew(crew))
-                print(f"  Building {building.id} ({building.type:10}) -> {crew_list}")
+                print(f"  Building {building.id} ({building.type}) -> {crew_list}")
                 new_scheduled.add(building.id)
-            print()  # Add space between days
+            print()
 
         # Update scheduled buildings
         scheduled_building_ids.update(new_scheduled)
 
         # Calculate and print weekly summary
-        total_buildings = len(all_buildings)
+        total_buildings = len(buildings)
         scheduled_buildings = len(scheduled_building_ids)
         pending_buildings = total_buildings - scheduled_buildings
 
-        print("\n" + "=" * 60)
-        print(f" WEEK {week_number} SUMMARY ".center(60, "-"))
+        print("-" * 40)
+        print(f"WEEK {week_number} SUMMARY")
         print(f"Buildings scheduled this week: {len(new_scheduled)}")
         print(f"Total scheduled to date:      {scheduled_buildings}/{total_buildings}")
         print(f"Remaining buildings:          {pending_buildings}")
+        print("-" * 40)
 
         if pending_buildings > 0:
-            pending_ids = sorted(set(b.id for b in all_buildings) - scheduled_building_ids)
-            print(f"\nPending Building IDs: {', '.join(map(str, pending_ids))}")
+            pending_buildings = [b for b in buildings if b.id not in scheduled_building_ids]
+            pending_ids = [str(b.id) for b in pending_buildings]
+            print(f"\nPending Building IDs: {', '.join(pending_ids)}")
 
-        print("=" * 60)
+        # Prevent infinite loop if no progress is made
+        if not new_scheduled and pending_buildings:
+            print("\nCould not schedule any of the remaining buildings with the current employee availability.")
+            print("Further scheduling attempts would result in an infinite loop. Exiting.")
+            break
 
         week_number += 1
 
